@@ -22,7 +22,7 @@ object Test {
     $locale = loc
   }
     
-	/** Reference message : "Acme, Inc." */
+	/** Reference value : "Acme, Inc." */
 	lazy val companyName = $resourceBundle.getString("companyName")
 
 	private lazy val error1$fmt = new MessageFormat($resourceBundle.getString("error1"))
@@ -41,10 +41,10 @@ object Test {
 	/** Reference message : "Weird text {0}" */
 	def error4(arg0: Any) = error4$fmt.format(Array[AnyRef](arg0.asInstanceOf[AnyRef]))
 
-	/** Reference message : "Not yet in other files !" */
+	/** Reference value : "Not yet in other files !" */
 	lazy val latestAddition = $resourceBundle.getString("latestAddition")
 
-	/** Reference message : "Resource Compiler" */
+	/** Reference value : "Resource Compiler" */
 	lazy val productName = $resourceBundle.getString("productName")
 
 	private lazy val title$fmt = new MessageFormat($resourceBundle.getString("title"))

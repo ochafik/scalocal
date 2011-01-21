@@ -155,12 +155,12 @@ object CompileResources {
   }
     """)
     
-    def outputExampleJavaDoc(key: String) =
+    def outputExampleJavaDoc(key: String, tpe: String) =
       for (f <- referenceFileOpt; msg <- fileProps(f).get(key))
-        out.println("\t/** Reference message : \"" + msg + "\" */")
+        out.println("\t/** Reference " + tpe + " : \"" + msg + "\" */")
         
     def outputVal(key: String) = {
-      outputExampleJavaDoc(key)
+      outputExampleJavaDoc(key, "value")
       out.println("\tlazy val " + key + " = $resourceBundle.getString(\"" + key + "\")")
       out.println()
     }
@@ -233,7 +233,7 @@ object CompileResources {
             )
           }
           out.println("\tprivate lazy val " + key + "$fmt = new MessageFormat($resourceBundle.getString(\"" + key + "\"))")
-          outputExampleJavaDoc(key)
+          outputExampleJavaDoc(key, "message")
           out.println("\tdef " + key + "(" + args.map(_._1).mkString(", ") + ") = " + key + "$fmt.format(Array[AnyRef](" + args.map(_._2).mkString(", ") + "))")
           out.println()
         }
