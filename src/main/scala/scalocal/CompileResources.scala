@@ -14,45 +14,38 @@ object CompileResources {
     (p.asInstanceOf[Map[String, String]]: collection.mutable.Map[String, String]).toMap
   }
   
+  trait Feedback {
+    def errors(error: String): Unit
+    def warnings(warning: String): Unit
+    def infos(info: String): Unit
+  }
   def main(args: Array[String]) {
     var hasError = false
     
-    def errors(error: String) = {
-      hasError = true
-      println("Error: " + error)
+    val feedback = new Feedback {
+      override def errors(error: String) = {
+        hasError = true
+        println("Error: " + error)
+      }
+      override def warnings(warning: String) = 
+        println("Warning: " + warning)
+        
+      override def infos(info: String) = 
+        println("Info: " + info)
     }
-    def warnings(warning: String) = 
-      println("Warning: " + warning)
-      
-    def infos(info: String) = 
-      println("Info: " + info)
     
     args.map(new File(_)) match {
       case Array(resourceRoot, outputDir) => 
-        for ((baseName, files) <- getPropertiesFilesByBaseName(Seq(resourceRoot))) {
-          infos("Resource '" + baseName + "' : found " + files.size + " files")
-          val parseMessages = true//simpleClassName.endsWith("Messages")
-        
-          compileResources(
-            outputDir,
-            baseName,
-            files,
-            parseMessages,
-            errors,
-            warnings,
-            infos
-          )
-        }
+        compileResources(resourceRoot, outputDir, feedback)
       case _ =>
-        hasError = true
-        errors("Syntax: resourceRoot outputDir")
+        feedback.errors("Syntax: resourceRoot outputDir")
     }
     
     if (hasError)
       System.exit(1)
   }
   
-  def getPropertiesFilesByBaseName(roots: Seq[File]): Map[String, Seq[File]] = {
+  private def getPropertiesFilesByBaseName(roots: Seq[File]): Map[String, Seq[File]] = {
     roots.flatMap(root => listFiles(root, _.getName.endsWith(".properties")).map { 
       case (file, path) =>
         var components = file.getName.split("\\.")
@@ -76,17 +69,35 @@ object CompileResources {
       Seq()
   }
    
+  def compileResources(
+    resourceRoot: File,
+    outputDir: File,
+    feedback: Feedback
+  ): Seq[File] = {
+    for ((baseName, files) <- getPropertiesFilesByBaseName(Seq(resourceRoot)).toSeq) yield {
+      feedback.infos("Resource '" + baseName + "' : found " + files.size + " files")
+      val parseMessages = true//simpleClassName.endsWith("Messages")
+    
+      compileResource(
+        outputDir,
+        baseName,
+        files,
+        parseMessages,
+        feedback
+      )
+    }
+  }
+  
   private val baseNameRx = """(?:(.*?)\.)?([^.]+)""".r
   
-  def compileResources(
+  def compileResource(
     outputDir: File,
     fullClassName: String,
     inputFiles: Seq[File],
     parseMessages: Boolean,
-    errors: String => Unit,
-    warnings: String => Unit,
-    infos: String => Unit
-  ) {
+    feedback: Feedback
+  ): File = {
+    
     val baseNameRx(packageName, simpleClassName) = fullClassName
     val fileProps = inputFiles.map(file => (file, readProperties(file))).toMap
     val referenceFileOpt = fileProps.find(fp => {
@@ -95,7 +106,7 @@ object CompileResources {
       n == simpleClassName + ".properties"
     }).map(_._1)
     for (referenceFile <- referenceFileOpt)
-      infos("Reference file for resource '" + fullClassName + "' : '" + referenceFile + "'")
+      feedback.infos("Reference file for resource '" + fullClassName + "' : '" + referenceFile + "'")
     
     val referenceKeys = referenceFileOpt.map(f => fileProps(f).keys).getOrElse(
       fileProps.flatMap(_._2.keys).toSet
@@ -104,12 +115,12 @@ object CompileResources {
     for ((file, props) <- fileProps) {
       val missingKeys = referenceKeys.filter(key => !props.contains(key))
       if (!missingKeys.isEmpty) {
-        errors(missingKeys.size + " missing keys in file '" + file + "' :")
+        feedback.errors(missingKeys.size + " missing keys in file '" + file + "' :")
         missingKeys.foreach(key => println("\t'" + key + "'"))
       }
       val unknownKeys = props.keys.filter(key => !referenceKeys.contains(key))
       if (!unknownKeys.isEmpty) {
-        warnings(unknownKeys.size + " unknown keys in file '" + file + "' :")
+        feedback.warnings(unknownKeys.size + " unknown keys in file '" + file + "' :")
         unknownKeys.foreach(key => println("\t'" + key + "'"))
       }
       
@@ -200,7 +211,7 @@ object CompileResources {
             else if (actualTypes.size == 1)
               actualTypes.head._1
             else {
-              errors("parameter " + index + " of message '" + key + "' has inconsistent format over the localized messages :")
+              feedback.errors("parameter " + index + " of message '" + key + "' has inconsistent format over the localized messages :")
               for ((_, file) <- actualTypes.flatMap(_._2)) println("\tMessage in file '" + file + "' : \n\t\t'" + fileProps(file)(key) + "'")
               "Any"
             }
@@ -212,7 +223,7 @@ object CompileResources {
         else {
           val minIndex = argTypes.keys.min
           if (minIndex > 0)
-            warnings("lowest parameter index in key '" + key + "' is " + minIndex + " (might be an error !)")
+            feedback.warnings("lowest parameter index in key '" + key + "' is " + minIndex + " (might be an error !)")
           val argCount = argTypes.keys.max + 1
           val args = for (i <- 0 until argCount) yield {
             val name = "arg" + i
@@ -233,6 +244,8 @@ object CompileResources {
     out.println("}")
     out.close
     
-    infos("wrote " + referenceKeys.size + " keys in source file '" + outputFile + "'")
+    feedback.infos("wrote " + referenceKeys.size + " keys in source file '" + outputFile + "'")
+    
+    outputFile
   }
 }
