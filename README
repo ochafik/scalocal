@@ -17,3 +17,5 @@ sbt 'run resourcesRootDirectory outputDirectory'
 For example :
 sbt 'run examples examples'
 
+Or in a typical project :
+sbt 'run path/to/someProject/src/main/resources path/to/someProject/src/main/scala'
