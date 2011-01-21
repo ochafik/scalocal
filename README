@@ -1,7 +1,17 @@
 Scalocal compiles message formats into typed resource bundles.
-As input, it takes the root directory that contains properties files and the output directory where the pre-compiled resource singletons will be generated.
 
-To run :
+Here's what it does :
+- it scans an input directory for properties files
+- it groups properties files by base name of their corresponding bundle (i.e. 'foo/bar/Test_en.properties' and 'foo.bar.Test.properties' have the same base name 'foo.bar.Test')
+- for each base name :
+	- it tries to find the reference properties file (the non-localized one, for instance 'Test.properties')
+	- it looks at all the keys defined in all the properties files for this base name and gathers format meta-data (argument types)
+	- it warns against inconsistencies of the same keys between different properties files
+	- it warns against missing keys in the other files (using the keys from the reference file if there is one, or all the keys defined in all the files)
+	- it warns against unknown keys if a reference file was found
+	- it creates a Scala object with one val per immutable message format, and one typed method per mutable message format (with the correct argument types, based on the format)
+
+Syntax :
 sbt 'run resourcesRootDirectory outputDirectory'
 
 For example :
