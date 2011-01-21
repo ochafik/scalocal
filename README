@@ -1,0 +1,9 @@
+Scalocal compiles message formats into typed resource bundles.
+As input, it takes the root directory that contains properties files and the output directory where the pre-compiled resource singletons will be generated.
+
+To run :
+sbt 'run resourcesRootDirectory outputDirectory'
+
+For example :
+sbt 'run examples examples'
+
