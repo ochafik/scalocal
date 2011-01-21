@@ -157,7 +157,7 @@ object CompileResources {
     
     def outputExampleJavaDoc(key: String, tpe: String) =
       for (f <- referenceFileOpt; msg <- fileProps(f).get(key))
-        out.println("\t/** Reference " + tpe + " : \"" + msg + "\" */")
+        out.println("\t/** Reference " + tpe + " : \"" + msg.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;") + "\" */")
         
     def outputVal(key: String) = {
       outputExampleJavaDoc(key, "value")
