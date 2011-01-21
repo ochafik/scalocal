@@ -5,7 +5,7 @@ import collection.JavaConversions._
 // scalac CompileResources.scala && scala CompileResources Test && scalac Test.scala Main.scala && scala Main
 object CompileResources {
   import java.io._
-  def read(file: File) = {
+  def readProperties(file: File) = {
     import java.util.{Properties, Map}
     val p = new Properties
     val in = new FileInputStream(file)
@@ -13,47 +13,82 @@ object CompileResources {
     finally { in.close }
     (p.asInstanceOf[Map[String, String]]: collection.mutable.Map[String, String]).toMap
   }
-  val baseNameRx = """(?:(.*?)\.)?([^.]+)""".r
   
-  val defaultBaseName = "Resources"
-  
-  def listPropertiesFiles(baseName: String) = 
-    new File(".").listFiles.filter(_.getName.matches(baseName.replaceAll("\\.", "\\.") + "(_.*?)?\\.properties"))
-    
   def main(args: Array[String]) {
     var hasError = false
     
-    val (fullClassName @ baseNameRx(packageName, simpleClassName), inputFiles) = args.toList match {
-      case Nil =>
-        (defaultBaseName, listPropertiesFiles(defaultBaseName))
-      case n :: Nil =>
-        (n, listPropertiesFiles(n))
-      case n :: paths =>
-        (n, paths.map(new File(_)).toArray)
+    def errors(error: String) = {
+      hasError = true
+      println("Error: " + error)
     }
-    val asMessages = true//simpleClassName.endsWith("Messages")
-    compileResouces(
-      fullClassName,
-      packageName,
-      simpleClassName,
-      inputFiles,
-      asMessages,
-      error => println("Error: " + error),
-      warning => println("Warning: " + warning),
-      info => println("Info: " + info)
-    )
+    def warnings(warning: String) = 
+      println("Warning: " + warning)
+      
+    def infos(info: String) = 
+      println("Info: " + info)
+    
+    args.map(new File(_)) match {
+      case Array(resourceRoot, outputDir) => 
+        for ((baseName, files) <- getPropertiesFilesByBaseName(Seq(resourceRoot))) {
+          infos("Resource '" + baseName + "' : found " + files.size + " files")
+          val parseMessages = true//simpleClassName.endsWith("Messages")
+        
+          compileResources(
+            outputDir,
+            baseName,
+            files,
+            parseMessages,
+            errors,
+            warnings,
+            infos
+          )
+        }
+      case _ =>
+        hasError = true
+        errors("Syntax: resourceRoot outputDir")
+    }
+    
+    if (hasError)
+      System.exit(1)
   }
+  
+  def getPropertiesFilesByBaseName(roots: Seq[File]): Map[String, Seq[File]] = {
+    roots.flatMap(root => listFiles(root, _.getName.endsWith(".properties")).map { 
+      case (file, path) =>
+        var components = file.getName.split("\\.")
+        assert(components.last == "properties")
+        components = components.dropRight(1)
+        val packageComponents = path ++ components.dropRight(1)
+        val simpleClassName = components.last.split("_")(0)
+        (
+          (packageComponents ++ Seq(simpleClassName)).mkString("."),
+          file
+        )
+    }).groupBy(_._1).map(p => (p._1, p._2.map(_._2)))
+  }
+  def listFiles(file: File, filter: File => Boolean, pathFromRoot: Seq[String] = Seq(), first: Boolean = true): Seq[(File, Seq[String])] = { 
+    if (file.isDirectory) {
+      val newPathFromRoot = if (first) pathFromRoot else pathFromRoot ++ Seq(file.getName)
+      file.listFiles.flatMap(listFiles(_ , filter, newPathFromRoot, false))
+    } else if (file.exists && filter(file))
+      Seq((file, pathFromRoot))
+    else
+      Seq()
+  }
+   
+  private val baseNameRx = """(?:(.*?)\.)?([^.]+)""".r
+  
   def compileResources(
+    outputDir: File,
     fullClassName: String,
-    packageName: String,
-    simpleClassName: String,
     inputFiles: Seq[File],
-    asMessages: Boolean,
+    parseMessages: Boolean,
     errors: String => Unit,
     warnings: String => Unit,
     infos: String => Unit
   ) {
-    val fileProps = inputFiles.map(file => (file, read(file))).toMap
+    val baseNameRx(packageName, simpleClassName) = fullClassName
+    val fileProps = inputFiles.map(file => (file, readProperties(file))).toMap
     val referenceFileOpt = fileProps.find(_._1.getName.equals(fullClassName + ".properties")).map(_._1)
     
     val referenceKeys = referenceFileOpt.map(f => fileProps(f).keys).getOrElse(
@@ -68,16 +103,23 @@ object CompileResources {
       }
       val unknownKeys = props.keys.filter(key => !referenceKeys.contains(key))
       if (!missingKeys.isEmpty) {
-        warning(unknownKeys.size + " unknown keys in file '" + file + "' :")
+        warnings(unknownKeys.size + " unknown keys in file '" + file + "' :")
         unknownKeys.foreach(key => println("\t'" + key + "'"))
       }
       
     }
     
-    val outputFile = simpleClassName + ".scala"
+    outputDir.mkdirs
+    val outputFile = new File(outputDir, fullClassName + ".scala")
     val out = new PrintStream(outputFile)
     if (Option(packageName).map(_.trim).getOrElse("") != "")
       out.println("package " + packageName)
+    out.println("""
+/**
+ * This resource singleton was autogenerated based on the contents of the following files :
+ * <ul><li>""" + inputFiles.mkString("</li>\n * <li>") + """</li></ul> 
+ */
+    """)
     out.println("import java.util._")
     out.println("import java.text._")
     out.println("object " + simpleClassName + " {")
@@ -106,7 +148,7 @@ object CompileResources {
       out.println()
     }
       
-    if (asMessages) {
+    if (parseMessages) {
       import java.text._
       for (key <- referenceKeys) {
         val formats = (
@@ -152,8 +194,7 @@ object CompileResources {
             else if (actualTypes.size == 1)
               actualTypes.head._1
             else {
-              hasError = true
-              errors(parameter " + index + " of message '" + key + "' has inconsistent format over the localized messages :")
+              errors("parameter " + index + " of message '" + key + "' has inconsistent format over the localized messages :")
               for ((_, file) <- actualTypes.flatMap(_._2)) println("\tMessage in file '" + file + "' : \n\t\t'" + fileProps(file)(key) + "'")
               "Any"
             }
@@ -187,7 +228,5 @@ object CompileResources {
     out.close
     
     infos("wrote " + referenceKeys.size + " keys in source file '" + outputFile + "'")
-    if (hasError)
-      System.exit(1)
   }
 }
