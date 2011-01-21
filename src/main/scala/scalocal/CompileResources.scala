@@ -15,23 +15,23 @@ object CompileResources {
   }
   
   trait Feedback {
-    def errors(error: String): Unit
-    def warnings(warning: String): Unit
-    def infos(info: String): Unit
+    def errors(msg: String): Unit
+    def warnings(msg: String): Unit
+    def infos(msg: String): Unit
   }
   def main(args: Array[String]) {
     var hasError = false
     
     val feedback = new Feedback {
-      override def errors(error: String) = {
+      override def errors(msg: String) = {
         hasError = true
-        println("Error: " + error)
+        println("Error: " + msg)
       }
-      override def warnings(warning: String) = 
-        println("Warning: " + warning)
+      override def warnings(msg: String) = 
+        println("Warning: " + msg)
         
-      override def infos(info: String) = 
-        println("Info: " + info)
+      override def infos(msg: String) = 
+        println("Info: " + msg)
     }
     
     args.map(new File(_)) match {
