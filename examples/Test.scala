@@ -41,6 +41,9 @@ object Test {
 	/** Reference message : "Weird text {0}" */
 	def error4(arg0: Any) = error4$fmt.format(Array[AnyRef](arg0.asInstanceOf[AnyRef]))
 
+	/** Reference message : "Not yet in other files !" */
+	lazy val latestAddition = $resourceBundle.getString("latestAddition")
+
 	/** Reference message : "Resource Compiler" */
 	lazy val productName = $resourceBundle.getString("productName")
 

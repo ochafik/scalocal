@@ -89,7 +89,13 @@ object CompileResources {
   ) {
     val baseNameRx(packageName, simpleClassName) = fullClassName
     val fileProps = inputFiles.map(file => (file, readProperties(file))).toMap
-    val referenceFileOpt = fileProps.find(_._1.getName.equals(fullClassName + ".properties")).map(_._1)
+    val referenceFileOpt = fileProps.find(fp => {
+      val n = fp._1.getName
+      n == fullClassName + ".properties" || 
+      n == simpleClassName + ".properties"
+    }).map(_._1)
+    for (referenceFile <- referenceFileOpt)
+      infos("Reference file for resource '" + fullClassName + "' : '" + referenceFile + "'")
     
     val referenceKeys = referenceFileOpt.map(f => fileProps(f).keys).getOrElse(
       fileProps.flatMap(_._2.keys).toSet
