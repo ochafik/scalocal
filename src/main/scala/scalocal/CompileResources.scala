@@ -102,7 +102,7 @@ object CompileResources {
         missingKeys.foreach(key => println("\t'" + key + "'"))
       }
       val unknownKeys = props.keys.filter(key => !referenceKeys.contains(key))
-      if (!missingKeys.isEmpty) {
+      if (!unknownKeys.isEmpty) {
         warnings(unknownKeys.size + " unknown keys in file '" + file + "' :")
         unknownKeys.foreach(key => println("\t'" + key + "'"))
       }
